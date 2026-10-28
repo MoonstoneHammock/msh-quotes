@@ -36,9 +36,10 @@ button:disabled{opacity:.4;cursor:not-allowed}
 th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;vertical-align:top}th{color:var(--mut);font-weight:600}.tg{font-size:11px;padding:2px 6px;border-radius:6px;background:rgba(179,38,30,.12);color:var(--bad)}
 hr{border:0;border-top:1px solid var(--line);margin:10px 0}
 </style></head><body>
-<header><img id="lg" alt="Moonstone Hammock"><div style="flex:1"><span>Quotation engine</span><b>Sales team</b></div><nav><button class="h on" id="tN">New quote</button><button class="h" id="tL">Saved quotes</button></nav></header>
+<header><img id="lg" alt="Moonstone Hammock"><div style="flex:1"><span>Quotation engine</span><b>Sales team</b></div><nav><button class="h" id="tN">New quote</button><button class="h" id="tR">Revise quote</button></nav></header>
 <div id="lock" style="position:fixed;inset:0;z-index:9;background:var(--bg);display:grid;place-items:center;padding:20px"><div class="card" style="max-width:360px;width:100%"><h2>Team passcode</h2><p class="note">Enter the passcode your manager gave you. You only need to do this once on each device.</p><input id="pw" type="password" autocomplete="off"><p id="lm" class="note bad"></p><button id="go" style="width:100%">Open</button></div></div>
 <div class="wrap" id="wN"><div>
+<div class="card" id="rq" hidden><h2>Revise an existing quote</h2><div class="g" style="grid-template-columns:1fr auto;align-items:end"><label>Quote number<input id="rqs" placeholder="e.g. MSH2026-014" autocomplete="off"></label><button id="rqo">Open quote</button></div><p class="note" id="rqm"></p></div>
 <div class="card" id="rev" hidden></div>
 <div class="card"><h2>1 · Stay</h2><div class="g">
 <label>Guest name<input id="gn" placeholder="Optional"></label>
@@ -61,7 +62,6 @@ hr{border:0;border-top:1px solid var(--line);margin:10px 0}
 <div id="adds"></div><p class="note">Add-on amounts are entered by sales (before tax) and attract 18% GST.</p></div>
 <div class="card"><h2>5 · Discount</h2><label style="max-width:220px">Discount % (max 10)<input id="dis" type="number" min="0" max="10" step="0.5" value="0"></label></div>
 </div><aside class="card" id="sum"></aside></div>
-<div class="wrap" id="wL" hidden style="display:block"><div class="card"><h2>Saved quotes</h2><input id="q" placeholder="Search by number, guest, rep or property"><div id="tb" style="overflow-x:auto;margin-top:10px"></div></div></div>
 <script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
@@ -153,7 +153,7 @@ const dl=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObje
 async function api(action,body){const r=await fetch(MSH_API,{method:'POST',body:JSON.stringify(Object.assign({action,pass:PASS},body||{}))});const j=await r.json();if(!j.ok)throw new Error(j.error||'Something went wrong');return j}
 const snap=()=>({pr:pr.value,gn:$('gn').value,ci:$('ci').value,co:$('co').value,rn:$('rn').value,rp:$('rp').value,ad:$('ad').value,k5:$('k5').value,k0:$('k0').value,pt:$('pt').value,dis:$('dis').value,drv:$('drv').checked,drvn:$('drvn').value,rooms:JSON.parse(JSON.stringify(rooms)),oth:($('oth')||{}).value||'',adds:[...document.querySelectorAll('[data-ad]')].filter(c=>c.checked).map(c=>({i:+c.dataset.ad,a:num2(c.dataset.ad),l:ADD[pr.value][+c.dataset.ad]||''}))});
 function load(f){pr.value=f.pr;drawAdds();['gn','ci','co','rn','rp','ad','k5','k0','pt','dis','drvn'].forEach(i=>$(i).value=f[i]);$('drv').checked=f.drv;$('drvn').disabled=!f.drv;rooms=f.rooms;drawRooms();$('oth').value=f.oth||'';f.adds.forEach(x=>{const ix=x.l?ADD[f.pr].indexOf(x.l):-1,ii=ix>=0?ix:x.i,c=document.querySelector(`[data-ad="${ii}"]`),a=document.querySelector(`[data-am="${ii}"]`);if(c){c.checked=true;a.disabled=false;a.value=x.a}});calc()}
-function showRev(){const r=$('rev');r.hidden=!editing;if(editing){r.innerHTML=`<b>${esc(editing.serial)}</b> · version ${editing.version}. Saving again creates <b>version ${editing.version+1}</b> with the same quote number. Earlier versions are kept.<br><button class="s" id="nq" style="margin-top:8px">Start a brand-new quote</button>`;$('nq').onclick=()=>location.reload()}}
+function showRev(){const r=$('rev');r.hidden=!editing;if(editing){r.innerHTML=`<b>${esc(editing.serial)}</b> · version ${editing.version}. Saving again creates <b>version ${editing.version+1}</b> with the same quote number. Earlier versions are kept.<br><span class="note">Prices use today’s rates, and the new quote is valid for 2 days from when you save it.</span><br><button class="s" id="nq" style="margin-top:8px">Start a brand-new quote</button>`;$('nq').onclick=()=>location.reload()}}
 async function gen(){$('dl').disabled=true;$('st').textContent='Saving…';try{const is=new Date(),ex=new Date(is.getTime()+2*864e5),R=last,f=snap();
  const res=await api('save',{quote:{serial:editing?editing.serial:'',rep:f.rn,repPhone:f.rp,guest:f.gn,property:PR[R.pk].name,ci:f.ci,co:f.co,total:Math.round(R.total),issued:is.toISOString(),valid:ex.toISOString(),data:{form:f,calc:R}}});
  dl(makePDF(R,res.serial,res.version,is,ex).output('blob'),res.serial+(res.version>1?'_v'+res.version:'')+'.pdf');
@@ -208,16 +208,13 @@ function makePDF(R,sn,ver,is,ex){const {jsPDF}=window.jspdf,doc=new jsPDF({unit:
  lab('Reach us',M+290,by+28,[170,170,170]);T('hello@moonstonehammock.com',M+290,by+46,{z:8.5,c:W});T('+91 93219 92712  /  93249 99753',M+290,by+60,{z:8.5,c:W});T('www.moonstonehammock.com',M+290,by+74,{z:8.5,c:W});T('Prepared by '+(m.rn||'').trim()+' · '+ph,M+290,by+90,{f:'PoppinsM',z:7.5,c:[240,205,150]});
  const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);T(sl+'  ·  Valid till '+fl(ex),M,826,{z:7,c:GR});T('Page '+i+' of '+n,X2,826,{z:7,c:GR,al:'right'})}
  return doc}
-const tab=t=>{$('wN').hidden=t!='N';$('wL').hidden=t!='L';$('tN').classList.toggle('on',t=='N');$('tL').classList.toggle('on',t=='L');if(t=='L')showList()};
-async function showList(){$('tb').textContent='Loading…';try{rows2=(await api('list')).rows;drawList()}catch(e){$('tb').textContent='Could not load: '+e.message}}
-function drawList(){const q=$('q').value.toLowerCase(),now=new Date(),mx={};rows2.forEach(r=>mx[r.serial]=Math.max(mx[r.serial]||0,r.ver));
- $('tb').innerHTML='<table style="width:100%;border-collapse:collapse"><tr>'+['Number','Ver','Guest','Property','Stay','Total','Rep','Valid till',''].map(h=>`<th>${h}</th>`).join('')+'</tr>'+rows2.filter(r=>JSON.stringify(r).toLowerCase().includes(q)).map(r=>`<tr><td><b>${esc(r.serial)}</b></td><td>${r.ver}${r.ver<mx[r.serial]?' <span class="note">(old)</span>':''}</td><td>${esc(r.guest)||'-'}</td><td>${esc(r.property)}</td><td>${esc(r.ci)} → ${esc(r.co)}</td><td>${INR(r.total)}</td><td>${esc(r.rep)}</td><td>${new Date(r.valid).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}${new Date(r.valid)<now?' <span class="tg">expired</span>':''}</td><td style="white-space:nowrap"><button class="s" data-a="pdf" data-s="${esc(r.serial)}" data-v="${r.ver}">PDF</button> <button class="s" data-a="rev" data-s="${esc(r.serial)}" data-v="${r.ver}">Revise</button></td></tr>`).join('')+'</table>'+(rows2.length?'':'<p class="note">No quotes saved yet.</p>')}
-$('tb').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const s=b.dataset.s,v=+b.dataset.v;b.disabled=true;
- try{const j=await api('get',{serial:s,version:v});
-  if(b.dataset.a=='pdf')dl(makePDF(j.data.calc,s,v,new Date(j.issued),new Date(j.valid)).output('blob'),s+(v>1?'_v'+v:'')+'.pdf');
-  else{const mxv=Math.max(...rows2.filter(r=>r.serial==s).map(r=>r.ver));load(j.data.form);editing={serial:s,version:mxv};showRev();tab('N');calc()}}
- catch(err){alert('Could not open: '+err.message)}b.disabled=false});
-$('q').oninput=drawList;$('tN').onclick=()=>tab('N');$('tL').onclick=()=>tab('L');
+const pad3=s=>{s=s.trim().toUpperCase();if(/^\d+$/.test(s))return 'MSH2026-'+s.padStart(3,'0');const m=s.match(/^MSH2026-?(\d+)$/);return m?'MSH2026-'+m[1].padStart(3,'0'):s};
+async function findLatest(s){let j;try{j=await api('get',{serial:s,version:1})}catch(e){throw new Error(e.message=='Quote not found'?'No quote found with that number.':e.message)}let v=1;for(;;){try{j=await api('get',{serial:s,version:v+1});v++}catch(e){if(e.message!='Quote not found')throw e;break}}return{v,j}}
+$('rqo').onclick=async()=>{const s=pad3($('rqs').value);if(!s){$('rqm').textContent='Type the quote number first.';return}$('rqm').textContent='Looking for '+s+'…';$('rqo').disabled=true;
+ try{const {v,j}=await findLatest(s);load(j.data.form);editing={serial:s,version:v};$('rq').hidden=true;$('tR').classList.remove('on');$('rqm').textContent='';showRev();calc()}catch(e){$('rqm').textContent=e.message}$('rqo').disabled=false};
+$('rqs').onkeydown=e=>{if(e.key=='Enter')$('rqo').click()};
+$('tR').onclick=()=>{$('rq').hidden=!$('rq').hidden;$('tR').classList.toggle('on',!$('rq').hidden);if(!$('rq').hidden)$('rqs').focus()};
+$('tN').onclick=()=>location.reload();
 async function unlock(p){PASS=p;try{await api('ping');localStorage.setItem('msh_pass',p);$('lock').hidden=true}catch(e){$('lm').textContent=e.message=='Wrong passcode'?'That passcode is not right.':'Could not connect – check the setup (config.js).'}}
 $('go').onclick=()=>unlock($('pw').value.trim());$('pw').onkeydown=e=>{if(e.key=='Enter')$('go').click()};
 if(typeof MSH_API=='undefined'||!/^https:\/\/script\.google\.com\//.test(MSH_API))$('lm').textContent='Not connected yet – the web app link in config.js is missing.';else if(PASS)unlock(PASS);
