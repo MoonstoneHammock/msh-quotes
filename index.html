@@ -60,7 +60,7 @@ hr{border:0;border-top:1px solid var(--line);margin:10px 0}
 <div class="card"><h2>4 · Services</h2>
 <div class="ar"><label><input type="checkbox" id="drv"> Driver food (₹1,000 / driver / night)</label><input id="drvn" type="number" min="1" value="1" disabled></div>
 <div id="adds"></div><p class="note">Add-on amounts are entered by sales (before tax) and attract 18% GST.</p></div>
-<div class="card"><h2>5 · Discount</h2><label style="max-width:220px">Discount % (max 10)<input id="dis" type="number" min="0" max="10" step="0.5" value="0"></label></div>
+<div class="card"><h2>5 · Discount</h2><label style="max-width:300px"><span id="dcl">Discount % (max 10)</span><input id="dis" type="number" min="0" max="10" step="0.5" value="0"></label></div>
 </div><aside class="card" id="sum"></aside></div>
 <script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -98,9 +98,10 @@ function autoAssign(){let a=num('ad'),k=num('k5'),f=num('k0');if(!rooms.length)r
 const nyP=(y,n)=>{const ks=Object.keys(y.s).map(Number).sort((a,b)=>a-b);if(y.x){const b=ks.filter(k=>k<=n).pop()||ks[0];return y.s[b]+Math.max(0,n-b)*y.x}return y.s[ks.find(k=>k>=n)||ks[ks.length-1]]};
 const nl=L=>[L.ny&&L.ny+' New Year package',L.sp&&L.sp+' Christmas special',L.wk&&L.wk+' weekday',L.we&&L.we+' Saturday'].filter(Boolean).join(' + ')+' night(s)';
 const tot=(d,r,t)=>d.unit?t[0]*r.a+t[0]*.5*r.k:t[0]+Math.max(0,r.a-2)*t[1]+Math.max(0,r.k-Math.max(0,2-r.a))*t[1]*.5;
-function calc(){const p=PR[pr.value],ns=nights(),dc=Math.min(10,num('dis')),E=[],ds=ns.map(d=>d.toISOString().slice(0,10));
+function calc(){const p=PR[pr.value],ns=nights(),cap=num('ad')>15?15:10,dc=Math.min(cap,num('dis')),E=[],ds=ns.map(d=>d.toISOString().slice(0,10));
  $('times').textContent=`Check-in from ${p.in} · Check-out by ${p.out}`;
- if(+$('dis').value>10)$('dis').value=10;
+ {const pp=num('ad');$('dis').max=cap;$('dcl').textContent='Discount % (max '+cap+'% for '+pp+' adult'+(pp==1?'':'s')+')';if(+$('dis').value>cap)$('dis').value=cap}
+ if(num('ad')>30)E.push('More than 30 adults needs approval before a quote can be issued');
  if(!$('rn').value.trim())E.push('Enter the sales rep name');
  if($('rp').value.replace(/\D/g,'').length<10)E.push('Enter a valid sales rep number');
  if(!ns.length)E.push('Select check-in and check-out dates');
